@@ -63,3 +63,10 @@ Demo öffnen → registrieren → Zeiten erfassen.
 HTML + Vanilla JS + Supabase (Postgres + Auth)
 
 Lizenz: MIT
+
+<p align="center">
+  <a href="https://buymeacoffee.com/weitz">
+    <img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=☕&slug=weitz&button_colour=FFDD00&font_colour=000000&font_family=Inter&outline_colour=000000&coffee_colour=ffffff" alt="Buy Me A Coffee">
+  </a>
+</p>
+
