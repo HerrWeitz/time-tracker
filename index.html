@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dienst-Tracker – Neu</title>
+  <style>
+    :root { --bg:#0f172a; --card:#111827; --muted:#94a3b8; --fg:#e5e7eb; --accent:#22c55e; --danger:#ef4444; --primary:#3b82f6; }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui, -apple-system, Segoe UI, Roboto}
+    .wrap{max-width:1000px;margin:28px auto;padding:0 16px}
+    .card{background:var(--card);border:1px solid #1f2937;border-radius:16px;padding:20px;box-shadow:0 10px 25px rgba(0,0,0,.25)}
+    h1{margin:0 0 12px}
+    h2{margin:0 0 10px;color:#cbd5e1;font-size:18px}
+    .row{display:flex;gap:10px;flex-wrap:wrap}
+    .col{flex:1 1 260px}
+    label{display:block;font-size:14px;color:var(--muted);margin:8px 0 4px}
+    input,button{width:100%;padding:12px 14px;border-radius:12px;border:1px solid #334155;background:#0b1220;color:var(--fg)}
+    input::placeholder{color:#64748b}
+    button{cursor:pointer}
+    .btn{background:#0b1220}
+    .btn-primary{background:var(--primary)}
+    .btn-accent{background:var(--accent);color:#052e16}
+    .btn-danger{background:var(--danger)}
+    .pill{display:inline-block;padding:.2rem .55rem;border:1px solid #334155;border-radius:999px;font-size:12px;color:#cbd5e1}
+    .muted{color:var(--muted)}
+    table{width:100%;border-collapse:separate;border-spacing:0 8px;margin-top:8px}
+    th,td{text-align:left;padding:10px 12px}
+    th{color:#cbd5e1}
+    tbody tr{background:#0b1220;border:1px solid #1f2937}
+    tbody td:first-child{border-radius:10px 0 0 10px}
+    tbody td:last-child{border-radius:0 10px 10px 0}
+    .right{text-align:right}
+    .note{font-size:13px;color:#a3a3a3}
+    .sep{height:1px;background:#1f2937;margin:16px 0}
+    #diag{position:fixed;bottom:12px;left:12px;background:#111827;border:1px solid #334155;border-radius:10px;padding:8px 12px;font:12px system-ui;z-index:9999}
+  </style>
+  <!-- Supabase JS v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>🕒 Dienst-Tracker</h1>
+
+    <!-- Auth -->
+    <div id="auth">
+      <h2>Anmelden / Registrieren</h2>
+      <div class="row">
+        <div class="col">
+          <label>E-Mail</label>
+          <input id="email" type="email" placeholder="name@example.com" />
+        </div>
+        <div class="col">
+          <label>Passwort</label>
+          <input id="password" type="password" placeholder="••••••••" />
+        </div>
+      </div>
+      <div class="row">
+        <button class="btn-primary" id="btnLogin">Anmelden</button>
+        <button class="btn" id="btnSignup">Registrieren</button>
+      </div>
+      <p class="note muted" id="authHint">Hinweis: Falls E-Mail-Bestätigung aktiv ist, musst du nach „Registrieren“ erst den Link in der Mail klicken.</p>
+    </div>
+
+    <div id="main" style="display:none">
+      <p>Angemeldet als: <span id="who" class="pill">–</span>
+        <button class="btn" id="btnLogout" style="width:auto;margin-left:8px">Abmelden</button>
+      </p>
+
+      <div class="sep"></div>
+
+      <div class="card" style="background:#0b1220">
+        <h2>Zeiterfassung</h2>
+        <div class="row">
+          <div class="col">
+            <label>Aktueller Dienst</label>
+            <div id="currentShift">—</div>
+          </div>
+          <div class="col">
+            <label>Notiz (optional)</label>
+            <input id="note" placeholder="z. B. Einsatz, Abteilung …" />
+          </div>
+        </div>
+        <div class="row">
+          <button class="btn-accent" id="btnStart">▶️ Dienst beginnen</button>
+          <button class="btn-danger" id="btnStop">⏹️ Dienst beenden</button>
+          <button class="btn" id="btnBreakStart">⏸️ Pause starten</button>
+          <button class="btn" id="btnBreakStop">▶️ Pause beenden</button>
+          <button class="btn" id="btnRefresh">Aktualisieren</button>
+          <button class="btn" id="btnExport">CSV exportieren</button>
+        </div>
+        <p class="note" id="weeklySum"></p>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="card" style="background:#0b1220">
+        <h2>Meine Einträge</h2>
+        <table>
+          <thead><tr><th>Start</th><th>Ende</th><th>Dauer</th><th>Notiz</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <p class="note" id="sum"></p>
+      </div>
+
+      <div id="adminCard" class="card" style="background:#0b1220;display:none">
+  <h2>🔐 Admin-Dashboard</h2>
+
+  <div class="row">
+    <div class="col">
+      <label>Bereich</label>
+      <div class="row">
+        <button class="btn" id="btnQuickToday">Heute</button>
+        <button class="btn" id="btnQuickWeek">Diese Woche</button>
+        <button class="btn" id="btnQuickMonth">Dieser Monat</button>
+      </div>
+    </div>
+    <div class="col">
+      <label>Von</label>
+      <input id="adminFrom" type="datetime-local" />
+    </div>
+    <div class="col">
+      <label>Bis</label>
+      <input id="adminTo" type="datetime-local" />
+    </div>
+    <div class="col">
+      <label>Suche (E-Mail/Notiz)</label>
+      <input id="adminSearch" placeholder="user@mail.com oder 'Nachtschicht'" />
+    </div>
+  </div>
+
+  <div class="row">
+    <button class="btn" id="btnAdminRefresh">Neu laden</button>
+    <button class="btn" id="btnAdminExport">CSV Export</button>
+    <button class="btn" id="btnAdminPdf">PDF Bericht</button>
+  </div>
+
+  <table style="margin-top:8px">
+    <thead>
+      <tr><th>User</th><th>Start</th><th>Ende</th><th>Dauer</th><th>Notiz</th></tr>
+    </thead>
+    <tbody id="adminRows"></tbody>
+  </table>
+  <p class="note" id="adminSum"></p>
+  </div>
+
+
+    <p class="note" style="margin-top:12px">Made with ❤️ — Single-File (Supabase). Owner: <b>Marlon Weitz</b></p>
+  </div>
+</div>
+
+<div id="diag" style="display:none"></div>
+
+<script>
+(function(){
+  // ========= KONFIG =========
+  const CONFIG = {
+    url: 'https://gkhssocnfpogaizpajch.supabase.co',
+    // Trage HIER deinen Publishable Key ein (wenn du ihn kopieren willst):
+    publishableKey: 'sb_publishable_hLJpEYYoFN9oI9xQpJ4u0w_s8l_vgcG', // z.B. 'sb_publishable_hLJpEVY...'
+    // Fallback (Legacy anon) – den hast du mir gegeben:
+    legacyAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdraHNzb2NuZnBvZ2FpenBhamNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY3NjkyMzAsImV4cCI6MjA3MjM0NTIzMH0.SiP14wgJubencN3uSkxe0VYpG0htcuUsGZl40A2GlQo',
+    adminUid: 'd0e4be01-281e-4843-b843-7ac76886284f'
+  };
+
+  // Namen manuell zuordnen (UID -> Name)
+const NAMES = {
+  'd0e4be01-281e-4843-b843-7ac76886284f': 'Marlon Weitz', // <- deine UID + dein Name
+  // weitere Leute kannst du so ergänzen: 'andere-UID': 'Name'
+};
+const nameFor = (id, email) => NAMES[id] || email || id;
+
+
+  // ========= HILFE / DIAG =========
+  const $ = (s)=>document.querySelector(s);
+  const diag = (m)=>{ const d=$('#diag'); d.style.display='block'; d.textContent=String(m); };
+
+  // ========= SUPABASE CLIENT (mit Fallback) =========
+  let sb = null; let currentKeyType='none';
+  function createClient(key, type){
+    sb = window.supabase.createClient(CONFIG.url, key, { auth:{ persistSession:true, autoRefreshToken:true }});
+    currentKeyType = type;
+    diag('Supabase init – key: '+type);
+  }
+  (function init(){
+    if(!window.supabase){ alert('Supabase-Bibliothek lädt nicht. Prüfe Internet/Adblocker.'); return; }
+    if(CONFIG.publishableKey){
+      createClient(CONFIG.publishableKey,'publishable');
+    } else {
+      createClient(CONFIG.legacyAnonKey,'legacy');
+    }
+  })();
+
+  async function tryAuthWithFallback(doAuthFn){
+    let res = await doAuthFn(sb);
+    if(res?.error && res.error.status === 401 && CONFIG.legacyAnonKey && currentKeyType!=='legacy'){
+      // Wechsel auf Legacy und nochmal versuchen
+      createClient(CONFIG.legacyAnonKey,'legacy');
+      res = await doAuthFn(sb);
+    }
+    return res;
+  }
+
+  // ========= AUTH =========
+  async function signUp(){
+    const email = $('#email').value.trim(), password = $('#password').value;
+    if(!email || !password) return alert('E-Mail & Passwort eingeben');
+    const { error } = await tryAuthWithFallback(s => s.auth.signUp({ email, password }));
+    if(error) alert(error.message); else alert('Registrierung ok. Prüfe ggf. Bestätigungs-Mail.');
+  }
+  async function signIn(){
+    const email = $('#email').value.trim(), password = $('#password').value;
+    if(!email || !password) return alert('E-Mail & Passwort eingeben');
+    const { error } = await tryAuthWithFallback(s => s.auth.signInWithPassword({ email, password }));
+    if(error) alert(error.message);
+  }
+  async function signOut(){ await sb.auth.signOut(); }
+
+  $('#btnSignup').onclick = signUp;
+  $('#btnLogin').onclick = signIn;
+  $('#btnLogout').onclick = signOut;
+
+  sb.auth.onAuthStateChange((_e, session)=>{ render(session); if(session) refreshAll(); });
+  sb.auth.getSession().then(({ data:{ session } })=>{ render(session); if(session) refreshAll(); });
+
+  function render(session){
+    const logged = !!session;
+    $('#auth').style.display = logged ? 'none':'block';
+    $('#main').style.display = logged ? 'block':'none';
+    $('#who').textContent = logged ? (session.user.email || session.user.id) : '–';
+    const isAdmin = logged && (session.user.id === CONFIG.adminUid);
+    $('#adminCard').style.display = isAdmin ? 'block' : 'none';
+  }
+
+  async function uid(){ const { data:{ user } } = await sb.auth.getUser(); return user.id; }
+
+  // ========= BREAKS-HELPER =========
+  async function getOpenShift(){
+    const { data, error } = await sb.from('shifts').select('*').eq('user_id', await uid()).is('end_utc', null).order('start_utc',{ascending:false}).limit(1);
+    if(error) return null; return data && data[0] || null;
+  }
+  async function getOpenBreak(shiftId){
+    try{ const { data } = await sb.from('breaks').select('*').eq('shift_id', shiftId).is('end_utc', null).limit(1); return data && data[0] || null; }catch{ return null; }
+  }
+  async function sumBreakSeconds(shiftId){
+    try{ const { data } = await sb.from('breaks').select('start_utc,end_utc').eq('shift_id', shiftId); let s=0; const now=new Date();
+      for(const b of (data||[])){ const st=new Date(b.start_utc), en=b.end_utc?new Date(b.end_utc):now; s += Math.max(0, Math.round((en-st)/1000)); }
+      return s;
+    }catch{ return 0; }
+  }
+
+  // ========= UI / DATEN =========
+  function fmt(dt){ return dt ? new Date(dt).toLocaleString() : '—'; }
+  function secsToHMS(sec){ const h=Math.floor(sec/3600), m=Math.floor((sec%3600)/60); return `${h}h ${m}m`; }
+
+  async function refreshAll(){
+    const open = await getOpenShift();
+    $('#currentShift').textContent = open ? `Gestartet: ${fmt(open.start_utc)}${open.note?` — ${open.note}`:''}` : 'Nicht im Dienst';
+
+    const { data, error } = await sb.from('shifts').select('*').eq('user_id', await uid()).order('start_utc',{ascending:false}).limit(500);
+    if(error){ alert(error.message); return; }
+
+    const tbody = $('#rows'); tbody.innerHTML=''; let total=0;
+    for(const r of (data||[])){
+      const pause = await sumBreakSeconds(r.id);
+      const dur = r.end_utc ? Math.max(0, Math.round((new Date(r.end_utc)-new Date(r.start_utc))/1000)-pause) : 0;
+      total += dur;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${fmt(r.start_utc)}</td><td>${fmt(r.end_utc)}</td><td>${r.end_utc?secsToHMS(dur):'läuft…'}</td><td>${r.note||''}</td>`;
+      tbody.appendChild(tr);
+    }
+    $('#sum').textContent = `Summe: ${secsToHMS(total)}`;
+    updateWeekly();
+    loadAdmin();
+  }
+
+  async function startShift(){
+    if(await getOpenShift()) return alert('Es läuft bereits ein Dienst.');
+    const note = $('#note').value.trim()||null;
+    const { data: u } = await sb.auth.getUser();
+    const { error } = await sb.from('shifts').insert({
+      user_id: await uid(), user_email: u?.user?.email||null,
+      start_utc: new Date().toISOString(), end_utc:null, duration_seconds:null, note
+    });
+    if(error) alert(error.message); await refreshAll();
+  }
+  async function stopShift(){
+    const current = await getOpenShift(); if(!current) return alert('Kein laufender Dienst.');
+    const end = new Date();
+    const gross = Math.max(0, Math.round((end - new Date(current.start_utc))/1000));
+    const pause = await sumBreakSeconds(current.id);
+    const net = Math.max(0, gross - pause);
+    const { error } = await sb.from('shifts').update({ end_utc:end.toISOString(), duration_seconds:net }).eq('id', current.id);
+    if(error) alert(error.message); await refreshAll();
+  }
+
+  $('#btnStart').onclick = startShift;
+  $('#btnStop').onclick  = stopShift;
+  $('#btnRefresh').onclick = refreshAll;
+
+  // Pausen
+  $('#btnBreakStart').onclick = async ()=>{
+    const current = await getOpenShift(); if(!current) return alert('Kein laufender Dienst.');
+    try{
+      const open = await getOpenBreak(current.id); if(open) return alert('Es läuft bereits eine Pause.');
+      const ins = await sb.from('breaks').insert({ shift_id: current.id, start_utc: new Date().toISOString(), end_utc: null });
+      if(ins.error) throw ins.error; alert('Pause gestartet.');
+    }catch(e){ alert('Pausen-Tabelle fehlt oder Policy blockt.'); }
+    await refreshAll();
+  };
+  $('#btnBreakStop').onclick = async ()=>{
+    const current = await getOpenShift(); if(!current) return alert('Kein laufender Dienst.');
+    try{
+      const open = await getOpenBreak(current.id); if(!open) return alert('Keine laufende Pause.');
+      const up = await sb.from('breaks').update({ end_utc: new Date().toISOString() }).eq('id', open.id);
+      if(up.error) throw up.error; alert('Pause beendet.');
+    }catch(e){ alert('Konnte Pause nicht beenden.'); }
+    await refreshAll();
+  };
+
+  // Export CSV
+  $('#btnExport').onclick = async ()=>{
+    const { data } = await sb.from('shifts').select('start_utc,end_utc,duration_seconds,note').eq('user_id', await uid()).order('start_utc',{ascending:true});
+    const rows = data||[]; let csv='start_utc,end_utc,duration_seconds,note\n';
+    for(const r of rows){ csv += `"${r.start_utc}","${r.end_utc||''}","${r.duration_seconds||''}","${(r.note||'').replaceAll('"','""')}"\n`; }
+    const url = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+    const a = Object.assign(document.createElement('a'), { href:url, download:`dienst-tracker_${new Date().toISOString().slice(0,10)}.csv` });
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  };
+
+  // Woche (Mo–So)
+  async function updateWeekly(){
+    const now = new Date(); const day=(now.getDay()+6)%7;
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate()-day);
+    const { data } = await sb.from('shifts').select('*').eq('user_id', await uid()).gte('start_utc', monday.toISOString());
+    let total=0; for(const r of (data||[])){ const pause=await sumBreakSeconds(r.id); const dur=r.end_utc?Math.max(0, Math.round((new Date(r.end_utc)-new Date(r.start_utc))/1000)-pause):0; total+=dur; }
+    $('#weeklySum').textContent = `Diese Woche: ${secsToHMS(total)}`;
+  }
+
+  // Admin (einfach)
+  // ===== Admin (erweitert) =====
+
+// Zeitbereichs-Buttons
+function setQuickRange(which){
+  const now = new Date();
+  if(which==='today'){
+    const s = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0,0);
+    const e = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23,59);
+    document.getElementById('adminFrom').value = s.toISOString().slice(0,16);
+    document.getElementById('adminTo').value   = e.toISOString().slice(0,16);
+  } else if(which==='week'){
+    const sod = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const day = (sod.getDay()+6)%7; // Mo=0
+    const mon = new Date(sod); mon.setDate(sod.getDate()-day);
+    const sun = new Date(mon); sun.setDate(mon.getDate()+6); sun.setHours(23,59,0,0);
+    document.getElementById('adminFrom').value = mon.toISOString().slice(0,16);
+    document.getElementById('adminTo').value   = sun.toISOString().slice(0,16);
+  } else if(which==='month'){
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    const last  = new Date(now.getFullYear(), now.getMonth()+1, 0, 23,59);
+    document.getElementById('adminFrom').value = first.toISOString().slice(0,16);
+    document.getElementById('adminTo').value   = last.toISOString().slice(0,16);
+  }
+}
+document.getElementById('btnQuickToday').onclick = ()=>setQuickRange('today');
+document.getElementById('btnQuickWeek').onclick  = ()=>setQuickRange('week');
+document.getElementById('btnQuickMonth').onclick = ()=>setQuickRange('month');
+
+// Datensammlung mit Filtern + Netto-Dauer (Pausen abgezogen)
+async function adminFetch(){
+  const from = document.getElementById('adminFrom').value ? new Date(document.getElementById('adminFrom').value) : null;
+  const to   = document.getElementById('adminTo').value   ? new Date(document.getElementById('adminTo').value)   : null;
+  const term = (document.getElementById('adminSearch').value||'').toLowerCase();
+
+  let q = sb.from('shifts').select('*').order('start_utc',{ascending:false}).limit(2000);
+  if(from) q = q.gte('start_utc', from.toISOString());
+  if(to)   q = q.lte('start_utc', to.toISOString());
+  const { data, error } = await q;
+  if(error){ alert(error.message); return []; }
+
+  const rows = (data||[]).filter(r => 
+    !term || (r.user_email||'').toLowerCase().includes(term) || (r.note||'').toLowerCase().includes(term)
+  );
+
+  for(const r of rows){
+    const pause = await sumBreakSeconds(r.id);
+    r._net = r.end_utc ? Math.max(0, Math.round((new Date(r.end_utc)-new Date(r.start_utc))/1000) - pause) : 0;
+  }
+  return rows;
+}
+
+// Render + Buttons
+async function adminRender(){
+  const { data:{ user } } = await sb.auth.getUser();
+  if(!user || user.id !== CONFIG.adminUid) return; // nur Admin sieht Daten
+
+  const rows = await adminFetch();
+  const tb = document.getElementById('adminRows'); tb.innerHTML = '';
+  let total = 0;
+  for(const r of rows){
+    total += r._net;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+  <td>${nameFor(r.user_id, r.user_email)}</td>
+  <td>${fmt(r.start_utc)}</td>
+  <td>${fmt(r.end_utc)}</td>
+  <td>${r.end_utc?secsToHMS(r._net):'läuft…'}</td>
+  <td>${r.note||''}</td>`;
+
+    tb.appendChild(tr);
+  }
+  document.getElementById('adminSum').textContent = `Summe (gefiltert): ${secsToHMS(total)}`;
+}
+document.getElementById('btnAdminRefresh').onclick = adminRender;
+
+// CSV Export
+document.getElementById('btnAdminExport').onclick = async ()=>{
+  const rows = await adminFetch();
+  let csv = 'user,start_utc,end_utc,duration_seconds,note\n';
+  for(const r of rows){
+    csv += `"${nameFor(r.user_id, r.user_email)}","${r.start_utc}","${r.end_utc||''}","${r._net||0}","${(r.note||'').replaceAll('"','""')}"\n`;
+  }
+  const url = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  const a = Object.assign(document.createElement('a'), { href:url, download:`dienst-tracker_admin_${new Date().toISOString().slice(0,10)}.csv` });
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+};
+
+// PDF Export
+document.getElementById('btnAdminPdf').onclick = async ()=>{
+  const rows = await adminFetch();
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  doc.setFontSize(14); doc.text('Dienst-Tracker – Admin Bericht', 14, 16);
+  doc.setFontSize(10);
+  let y=26, total=0;
+  doc.text('User',14,y); doc.text('Start',60,y); doc.text('Ende',110,y); doc.text('Dauer',160,y); y+=6;
+
+  for(const r of rows){
+    total += r._net;
+    if(y>280){ doc.addPage(); y=16; }
+    doc.text(String(nameFor(r.user_id, r.user_email)).slice(0,22), 14, y);
+    doc.text(fmt(r.start_utc),60,y);
+    doc.text(fmt(r.end_utc),110,y);
+    doc.text(secsToHMS(r._net),160,y);
+    y+=6;
+  }
+  y+=4; doc.text(`Summe: ${secsToHMS(total)}`,14,y);
+  doc.save(`dienst-tracker_report_${new Date().toISOString().slice(0,10)}.pdf`);
+};
+
+
+  // Globaler Fehlerfänger
+  window.addEventListener('error', e=>diag('JS-Fehler: '+e.message));
+})();
+</script>
+</body>
+</html>
