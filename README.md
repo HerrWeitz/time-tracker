@@ -2,8 +2,7 @@
 
 A tiny, self-hostable time-tracking app. Punch in/out, add breaks, see weekly totals, export CSV/PDF — all in one `index.html`. Data is stored in Supabase (Postgres) with Row-Level Security, so each user only sees their own entries. No server needed; works on GitHub Pages.
 
-**Demo:** https://USERNAME.github.io/time-tracker/  
-*(replace `USERNAME` with your GitHub handle)*
+**Demo:** https://HerrWeitz.github.io/time-tracker/  
 
 ## Features
 - Start/stop shifts + pauses (breaks)
